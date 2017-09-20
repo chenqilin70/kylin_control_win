@@ -1,14 +1,22 @@
 package com.huwl.oracle.kylin_control_win;
 
+import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.junit.Test;
 
@@ -36,7 +44,7 @@ public class TestCenter {
      * @throws WriterException 
      * @throws IOException 
      */  
-    @Test 
+   // @Test 
     public void testEncode() throws WriterException, IOException {  
         String filePath = "D://";  
         String fileName = "zxing.png";  
@@ -55,13 +63,14 @@ public class TestCenter {
                 BarcodeFormat.QR_CODE, width, height, hints);// 生成矩阵  
         Path path = FileSystems.getDefault().getPath(filePath, fileName);  
         MatrixToImageWriter.writeToPath(bitMatrix, format, path);// 输出图像  
+        
         System.out.println("输出成功.");  
     }  
   
     /** 
      * 解析图像 
      */  
-    @Test  
+    //@Test  
     public void testDecode() {  
         String filePath = "D://zxing.png";  
         BufferedImage image;  
@@ -84,5 +93,39 @@ public class TestCenter {
         } catch (NotFoundException e) {  
             e.printStackTrace();  
         }  
+    } 
+    
+    @Test
+    public  void cutImage() {  
+        try {  
+        	for(int i=0;i<30;i++){
+        		Iterator iterator = ImageIO.getImageReadersByFormatName("PNG");/*PNG,BMP*/     
+                ImageReader reader = (ImageReader)iterator.next();/*获取图片尺寸*/  
+                InputStream inputStream = new FileInputStream("src/main/resources/imgs/loading.png");    
+                ImageInputStream iis = ImageIO.createImageInputStream(inputStream);     
+                reader.setInput(iis, true);     
+                ImageReadParam param = reader.getDefaultReadParam();     
+                Rectangle rectangle = new Rectangle(i*64,0, 64, 59);/*指定截取范围*/      
+                param.setSourceRegion(rectangle);     
+                BufferedImage bi = reader.read(0,param);   
+                ImageIO.write(bi, "PNG", new File("D:/tempFile/loading"+i+".png")); 
+                System.out.println(i+"生成");
+        	}
+             
+        } catch (Exception e) {  
+            e.printStackTrace();
+        }  
     }  
+    @Test
+    public void test(){
+    	InetAddress addr = null;
+        String name = "";
+        try {
+            addr = InetAddress.getLocalHost();//新建一个InetAddress类
+            name = addr.getHostName().toString();// 获得本机名称
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        System.out.println(name);
+    }
 }
