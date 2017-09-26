@@ -1,5 +1,7 @@
 package com.huwl.oracle.kylinremotecontrol.beans;
 
+import com.google.gson.internal.LinkedTreeMap;
+
 import java.io.IOException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
@@ -9,7 +11,7 @@ import java.util.Map;
 
 public class NetMessage implements Serializable{
 	public static final int LOGIN=0,REGISTER=1,REQUEST_QR_CODE=3
-			,PROVIDE_QR_CODE=4,VALIDATE_LOGIN=5;
+			,PROVIDE_QR_CODE=4,VALIDATE_LOGIN=5,AUTO_LOGIN=6;
 	private int forWhat;
 	private User user;
 	private Map map=new HashMap();;
@@ -49,7 +51,24 @@ public class NetMessage implements Serializable{
 				e.printStackTrace();
 			}
 		}
+	}
+	public void  transformNetMessage(){
+		final Map map=getMap();
+		LinkedTreeMap terminalMap= (LinkedTreeMap) map.get("terminal");
 
-
+		final Terminal t=new Terminal();
+		if(terminalMap!=null){
+			t.setIp((String) terminalMap.get("ip"));
+			t.setId((String) terminalMap.get("id"));
+			t.setName((String) terminalMap.get("name"));
+			t.setRemark((String) terminalMap.get("name"));
+			t.setSystemType((String) terminalMap.get("systemType"));
+			map.put("terminal",t);
+			LinkedTreeMap userMap= (LinkedTreeMap) terminalMap.get("user");
+			if(userMap!=null){
+				final User user=new User((String) userMap.get("userId"),(String) userMap.get("password"));
+				t.setUser(user);
+			}
+		}
 	}
 }

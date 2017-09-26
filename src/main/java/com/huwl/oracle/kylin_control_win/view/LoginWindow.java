@@ -1,10 +1,20 @@
 package com.huwl.oracle.kylin_control_win.view;
 
+import java.awt.AWTException;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Image;
+import java.awt.MenuItem;
+import java.awt.PopupMenu;
+import java.awt.SystemTray;
 import java.awt.Toolkit;
+import java.awt.TrayIcon;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FileInputStream;
@@ -23,7 +33,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+
+
+
+
+
 import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -46,12 +62,16 @@ public class LoginWindow extends JWindow{
 	private static int loadingHeight=59;
 	private static  int loadingWidth=new Double(loadingHeight*1.14).intValue();
 	private static Terminal terminal;
-	private volatile boolean loadingFlag=true;
+	private static final int PROVIDE_QR_CODE=1,LOADING=0;
+	private volatile static int LOOP_FLAG=LOADING;
+	private static String IP="120.24.244.103";
+	//	private static String IP="116.208.103.53";
 	static{
 		for(int i=0;i<30;i++){
 			Image loadingImg=null;
 			try {
-				loadingImg = ImageIO.read(LoginWindow.class.getClassLoader().getResourceAsStream("imgs/loading"+i+".png"));
+				loadingImg = ImageIO.read(
+						LoginWindow.class.getClassLoader().getResourceAsStream("imgs/loading"+i+".png"));
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();
 			} catch (IOException e) {
@@ -95,15 +115,20 @@ public class LoginWindow extends JWindow{
 				e.printStackTrace();
 			}
 		}
-		
+		try {
+			terminal.setIp(InetAddress.getLocalHost().getHostAddress());
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
 	}
 	private JPanel leftPanel,rightPanel;
-	private JLabel brandLabel,loadingLable,loadTextLabel,qrcodeLabel;
+	private JLabel brandLabel,loadingLable,loadTextLabel,qrcodeLabel,closeLable;
 	private Color colorBack=new Color(50, 51, 56),colorFore=new Color(240,240,240);
+	private BufferedImage bimg;
 	private Socket socket;
 	public LoginWindow() {
 		try {
-			socket = new Socket("27.22.95.52",5544);
+			socket = new Socket(IP,5544);
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
@@ -120,7 +145,8 @@ public class LoginWindow extends JWindow{
 		this.getContentPane().setBackground(colorBack);
 		this.setAlwaysOnTop(true);
 		this.setLayout(null);
-		
+
+
 		
 		initConponents();
 		listen();
@@ -153,38 +179,50 @@ public class LoginWindow extends JWindow{
 					final NetMessage proxMsg=msg;
 					new Thread(){
 						public void run() {
-							
 							if(proxMsg.getForWhat()==NetMessage.PROVIDE_QR_CODE){
-								NetMessage netMessage=new NetMessage();
-								netMessage.setForWhat(NetMessage.VALIDATE_LOGIN);
-								netMessage.getMap().put("terminal", terminal);
-								netMessage.getMap().put("date",new Date());
-								Map<EncodeHintType, Object> hints = new HashMap<EncodeHintType, Object>();  
-						        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
-						        BitMatrix bitMatrix=null;
-								try {
-									bitMatrix = new MultiFormatWriter().encode(JSONObject.toJSONString(netMessage),  
-									        BarcodeFormat.QR_CODE, 164, 164, hints);
-								} catch (WriterException e) {
-									e.printStackTrace();
-								}// 生成矩阵  
-						        BufferedImage bimg=MatrixToImageWriter.toBufferedImage(bitMatrix
-						        		, new MatrixToImageConfig(0xFF323338,0xFFFAFAFA));
-								 
-						        loadingFlag=false;
-						        rightPanel.remove(loadingLable);
-						        rightPanel.remove(loadTextLabel);
-						        qrcodeLabel.setIcon(new ImageIcon(bimg));
-						        rightPanel.add(qrcodeLabel);
-						        LoginWindow.this.rePain();
-						        
+								provideQRCode(proxMsg);
+							}else if(proxMsg.getForWhat()==NetMessage.VALIDATE_LOGIN){
+								validateLogin(proxMsg);
 							}
-						};
+						}
+
 					}.start();
 				}
 			}
 		}.start();
 	}
+	private void validateLogin(NetMessage proxMsg) {
+		rightPanel.remove(qrcodeLabel);
+		loadTextLabel.setText(proxMsg.getUser().getUserId()+"已连接");
+        try {
+        	loadingLable.setIcon(
+        			new ImageIcon(ImageIO.read(this.getClass().getClassLoader()
+        					.getResourceAsStream("imgs/connect.png")).getScaledInstance(loadingHeight, loadingHeight, Image.SCALE_DEFAULT)));
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+        rightPanel.add(loadingLable);
+        rightPanel.add(loadTextLabel);
+        LoginWindow.this.rePain();
+	}
+	private void provideQRCode(NetMessage proxMsg) {
+		NetMessage netMessage=new NetMessage();
+		netMessage.setForWhat(NetMessage.VALIDATE_LOGIN);
+		netMessage.getMap().put("terminal", terminal);
+		netMessage.getMap().put("date",proxMsg.getMap().get("date")+"");
+		Map<EncodeHintType, Object> hints = new HashMap<EncodeHintType, Object>();  
+        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        BitMatrix bitMatrix=null;
+		try {
+			bitMatrix = new MultiFormatWriter().encode(JSONObject.toJSONString(netMessage),  
+			        BarcodeFormat.QR_CODE, 164, 164, hints);
+		} catch (WriterException e) {
+			e.printStackTrace();
+		}// 生成矩阵  
+        bimg=MatrixToImageWriter.toBufferedImage(bitMatrix
+        		, new MatrixToImageConfig(0xFF323338,0xFFFAFAFA));
+        LOOP_FLAG=PROVIDE_QR_CODE;
+	};
 	private void requestLogin() {
 	
 		final NetMessage m=new NetMessage();
@@ -193,19 +231,6 @@ public class LoginWindow extends JWindow{
 		new Thread(){
 			public void run() {
 				m.send(socket);
-				/*while(true){
-					try {
-						ObjectInputStream in=new ObjectInputStream(socket.getInputStream());
-						NetMessage imgMsg=null;
-						try {
-							imgMsg=(NetMessage) in.readObject();
-						} catch (ClassNotFoundException e) {
-							e.printStackTrace();
-						}
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}*/
 			};
 		}.start();
 		
@@ -236,8 +261,6 @@ public class LoginWindow extends JWindow{
 		this.add(leftPanel);
 		
 		
-//		loginBtn=new JLabel("登录");
-//		loginBtn.setBounds(0, 0, 100, 30);
 		
 		loadingLable=new JLabel();
 		loadingLable.setVisible(true);
@@ -245,7 +268,7 @@ public class LoginWindow extends JWindow{
 				, loadingWidth, loadingHeight);
 		new Thread(){
 			public void run() {
-				while(loadingFlag){
+				while(LOOP_FLAG==LOADING){
 					for(int i=0;i<30;i++){
 						loadingLable.setIcon(loadings.get(i));
 						try {
@@ -254,6 +277,13 @@ public class LoginWindow extends JWindow{
 							e.printStackTrace();
 						}
 					}
+				}
+				if(LOOP_FLAG==PROVIDE_QR_CODE){
+					rightPanel.remove(loadingLable);
+			        rightPanel.remove(loadTextLabel);
+			        qrcodeLabel.setIcon(new ImageIcon(bimg));
+			        rightPanel.add(qrcodeLabel);
+			        LoginWindow.this.rePain();
 				}
 			};
 		}.start();
@@ -264,6 +294,52 @@ public class LoginWindow extends JWindow{
 		loadTextLabel.setHorizontalAlignment(SwingConstants.CENTER);
 		loadTextLabel.setFont(new Font("微软雅黑", Font.PLAIN, 12));
 		
+		closeLable=new JLabel();
+		try {
+			closeLable.setIcon(new ImageIcon(
+					ImageIO.read(
+							this.getClass().getClassLoader()
+							.getResourceAsStream("imgs/close.png"))
+							.getScaledInstance(20, 20, Image.SCALE_DEFAULT)));
+		} catch (IOException e3) {
+			e3.printStackTrace();
+		}
+		closeLable.setVisible(true);
+		closeLable.setBounds(177,-5,20,20);
+		closeLable.setCursor(new Cursor(Cursor.HAND_CURSOR));
+		closeLable.addMouseListener(new MouseListener() {
+			public void mouseReleased(MouseEvent arg0) {}
+			public void mousePressed(MouseEvent arg0) {}
+			public void mouseExited(MouseEvent arg0) {
+				try {
+					closeLable.setIcon(new ImageIcon(
+							ImageIO.read(
+									this.getClass().getClassLoader()
+									.getResourceAsStream("imgs/close.png"))
+									.getScaledInstance(20, 20, Image.SCALE_DEFAULT)));
+				} catch (IOException e3) {
+					e3.printStackTrace();
+				}
+			}
+			
+			public void mouseEntered(MouseEvent arg0) {
+				try {
+					closeLable.setIcon(new ImageIcon(
+							ImageIO.read(
+									this.getClass().getClassLoader()
+									.getResourceAsStream("imgs/close_red.png"))
+									.getScaledInstance(20, 20, Image.SCALE_DEFAULT)));
+				} catch (IOException e3) {
+					e3.printStackTrace();
+				}
+			}
+			
+			public void mouseClicked(MouseEvent arg0) {
+				LoginWindow.this.setVisible(false);
+				
+			}
+		});
+		
 		rightPanel=new JPanel();
 		rightPanel.setVisible(true);
 		rightPanel.setBounds(300, 3, 197, 164);
@@ -271,12 +347,52 @@ public class LoginWindow extends JWindow{
 		rightPanel.setLayout(null);
 		rightPanel.add(loadingLable);
 		rightPanel.add(loadTextLabel);
+		rightPanel.add(closeLable);
 		this.add(rightPanel);
 		
 		qrcodeLabel=new JLabel();
 		qrcodeLabel.setVisible(true);
 		qrcodeLabel.setBounds((197-164)/2, 0, 197, 164);
 		
+		
+		
+		if(SystemTray.isSupported()){//判断系统是否托盘  
+            //创建一个托盘图标对象  
+            TrayIcon icon=null;
+			try {
+				icon = new TrayIcon(ImageIO.read(this.getClass().getClassLoader().getResourceAsStream("imgs/icon_small.png")).getScaledInstance(18, 18, Image.SCALE_DEFAULT));
+			} catch (IOException e2) {
+				e2.printStackTrace();
+			}  
+			icon.addMouseListener(new MouseListener() {
+				public void mouseReleased(MouseEvent arg0) {}
+				public void mousePressed(MouseEvent arg0) {}
+				public void mouseExited(MouseEvent arg0) {}
+				public void mouseEntered(MouseEvent arg0) {}
+				public void mouseClicked(MouseEvent arg0) {
+					LoginWindow.this.setVisible(true);
+				}
+			});
+            //创建弹出菜单  
+            PopupMenu menu = new PopupMenu();  
+            //添加一个用于退出的按钮  
+            MenuItem item = new MenuItem("Exit");  
+            item.addActionListener(new ActionListener() {  
+                public void actionPerformed(ActionEvent e) {  
+                    System.exit(0);  
+                }  
+            });  
+            menu.add(item);  
+            //添加弹出菜单到托盘图标  
+            icon.setPopupMenu(menu);  
+            SystemTray tray = SystemTray.getSystemTray();//获取系统托盘  
+            try {  
+                tray.add(icon);  
+            } catch (AWTException e1) {  
+                // TODO Auto-generated catch block  
+                e1.printStackTrace();  
+            }//将托盘图表添加到系统托盘  
+        }
 		
 		
 	}

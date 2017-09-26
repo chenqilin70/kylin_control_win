@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -118,14 +119,10 @@ public class TestCenter {
     }  
     @Test
     public void test(){
-    	InetAddress addr = null;
-        String name = "";
-        try {
-            addr = InetAddress.getLocalHost();//新建一个InetAddress类
-            name = addr.getHostName().toString();// 获得本机名称
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        System.out.println(name);
+    	try {
+			System.out.println(InetAddress.getLocalHost().getHostAddress());
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+		}
     }
 }

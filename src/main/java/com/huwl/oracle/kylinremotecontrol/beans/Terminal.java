@@ -7,16 +7,18 @@ public class Terminal implements Serializable{
 	private String name;
 	private String systemType;
 	private String remark;
-	private String username;
+	private User user;
 	private String ip;
-	
-	
-	public String getUsername() {
-		return username;
+
+
+	public User getUser() {
+		return user;
 	}
-	public void setUsername(String username) {
-		this.username = username;
+
+	public void setUser(User user) {
+		this.user = user;
 	}
+
 	public String getRemark() {
 		return remark;
 	}
@@ -60,14 +62,33 @@ public class Terminal implements Serializable{
 				+ systemType + ", remark=" + remark + "]";
 	}
 	@Override
-	public boolean equals(Object arg0) {
-		if(arg0 instanceof Terminal){
-			Terminal arg=(Terminal) arg0;
-			return this.getId()==arg.getId();
-		}else{
-			return false;
-		}
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + ((id == null) ? 0 : id.hashCode());
+		return result;
 	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Terminal other = (Terminal) obj;
+		if (id == null) {
+			if (other.id != null)
+				return false;
+		} else if (!id.equals(other.id))
+			return false;
+		return true;
+	}
+
+	public Terminal() {
+	}
+	
 	
 	
 	
